@@ -9,9 +9,6 @@ import pandas as pd
 import datetime
 import csv
 
-
-
-
 path_Mattia = '/home/gueststudente/Giustizia/Pre-processing/NER_model/it_nerIta_trf/it_nerIta_trf-0.0.0'
 spacy.prefer_gpu()             
 nlp = spacy.load(path_Mattia)
