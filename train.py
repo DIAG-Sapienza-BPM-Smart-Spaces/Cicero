@@ -122,7 +122,7 @@ trainer = Trainer(
 trainer.train()
 
 # Set the output directory
-output_dir = '/home/gueststudente/Giustizia/Processing/output_dir'
+output_dir = 'output'
 
 # Create the output directory if it doesn't exist
 if not os.path.exists(output_dir):
