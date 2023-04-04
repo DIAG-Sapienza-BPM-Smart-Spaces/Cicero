@@ -69,7 +69,7 @@ def print_summary(result):
 
 def working_models() -> list:
     # Define a list of working models
-    models = ["sberbank-ai/mGPT","GroNLP/gpt2-small-italian", "GroNLP/gpt2-medium-italian-embeddings", "facebook/xglm-1.7B",
+    models = ["GroNLP/gpt2-medium-italian-embeddings","sberbank-ai/mGPT","GroNLP/gpt2-small-italian", "GroNLP/gpt2-medium-italian-embeddings", "facebook/xglm-1.7B",
               "facebook/xglm-7.5B",  "facebook/xglm-564M" ]
     
     # Return the list of models

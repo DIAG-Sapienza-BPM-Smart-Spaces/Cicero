@@ -38,7 +38,7 @@ print('Selected model: ', model_nm)
 
 # Set the path to the CSV file
 
-doc_path = "merge_2_99999.csv"
+doc_path = "merge_2_GLSA_02_04.csv"
 # Load the data from the CSV file into two separate dataframes, one for training and one for testing
 train, test = load_into_dataframes(doc_path)
 print_gpu_utilization()
