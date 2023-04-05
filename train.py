@@ -82,7 +82,9 @@ print_gpu_utilization()
 
 # Load the pre-trained language model for causal language modeling with caching disabled
 # and move it to the specified device (e.g. GPU)
-model = AutoModelForCausalLM.from_pretrained(model_nm, use_cache=False).to(device)
+model = AutoModelForCausalLM.from_pretrained(model_nm)
+model = nn.DataParallel(model)
+model = model.to(device)
 
 
 # if still empty something went wrong
@@ -94,11 +96,9 @@ training_args = TrainingArguments(
     evaluation_strategy="epoch", # The frequency at which to evaluate the model during training (in this case, at the end of each epoch)
     learning_rate=2e-5, # The learning rate to use for the optimizer during training
     weight_decay=0.01, # The weight decay to use for the optimizer during training
-    num_train_epochs=15, # The number of epochs to train the model for
-    per_device_train_batch_size=1, # The batch size to use for training on each device (in this case, 2)
-    per_device_eval_batch_size=1, # The batch size to use for evaluation on each device (in this case, 2)
-    gradient_accumulation_steps=1, # The number of gradient accumulation steps to use to offset the small batch size due to memory constraints
-    gradient_checkpointing=True, # Whether to use gradient checkpointing to reduce memory usage during training
+    num_train_epochs=3, # The number of epochs to train the model for
+    per_device_train_batch_size=125, # The batch size to use for training on each device (in this case, 2)
+    per_device_eval_batch_size=125, # The batch size to use for evaluation on each device (in this case, 2)
     fp16=True # Whether to use mixed precision training to speed up training and reduce memory usage
 )
 
@@ -114,7 +114,7 @@ trainer = Trainer(
 
 # ===========================================
 # ||                                       ||
-# ||Section 5: training and saving         ||
+# ||Section 6: training and saving         ||
 # ||                                       ||
 # ===========================================
 
