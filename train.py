@@ -59,12 +59,12 @@ tokz = AutoTokenizer.from_pretrained(model_nm)
 tokz.pad_token = tokz.eos_token
 
 # GETTING MAX LENGTH
-max_length = get_max_lenghts(get_list_of_lengths(ds_train["text"], tokz))
+max_length = get_max_lenghts(get_list_of_lengths(ds["text"], tokz))
 
 # Define a function that tokenizes a text input and returns a dictionary containing the tokenized input
 # max_lenght can be changed according to preferences
 def tok_func(x):
-    return tokz(x["text"], truncation=True, max_length=10, padding="max_length") #TODO max_length=100
+    return tokz(x["text"], truncation=True, max_length=max_length, padding="max_length") #TODO max_length=100
 
 # Apply the tokenization function to the "train" and "test" datasets
 # removing the original "text" column and adding the tokenized column
