@@ -130,4 +130,18 @@ def get_list_of_lengths(text_column, tokenizer) -> int:
 
     return token_lens
 
+def get_max_lenghts(list_len) -> int:
+    # PART 1 MAX
 
+    # Convert the list to a PyTorch tensor
+    tensor_data = torch.tensor(list_len)
+
+    # getting the argmax index
+    argmax_index = tensor_data.argmax().item()
+
+    # getting the argmax
+
+    argmax = list_len[argmax_index]
+    print(f"The longest input sequence has value: {argmax}")
+    
+    return argmax
