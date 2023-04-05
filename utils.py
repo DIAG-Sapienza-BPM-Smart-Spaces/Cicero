@@ -117,4 +117,17 @@ def dataframe_2_datasets(train_df, test_df):
     return DatasetDict({"train": ds_train, "test": ds_test})
 
 
+# FUNCTION 4 MAX LENGTH TO SET TOKENIZER MAX LENGTH
+def get_list_of_lengths(text_column, tokenizer) -> int:
+    token_lens = []
+
+    for text in text_column:
+        # Tokenize the text and add `[CLS]` and `[SEP]` tokens => split in symbolic/textual tokens and map them to integer ids
+        tokens = tokenizer.encode(text, add_special_tokens=True)
+
+        # checking the len of tokenized sentence
+        token_lens.append(len(tokens))
+
+    return token_lens
+
 
