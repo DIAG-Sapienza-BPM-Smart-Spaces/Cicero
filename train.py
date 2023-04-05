@@ -58,6 +58,9 @@ tokz = AutoTokenizer.from_pretrained(model_nm)
 # Set the padding token to the end of sentence token
 tokz.pad_token = tokz.eos_token
 
+# GETTING MAX LENGTH
+max_length = get_max_lenghts(get_list_of_lengths(ds_train["text"], tokz))
+
 # Define a function that tokenizes a text input and returns a dictionary containing the tokenized input
 # max_lenght can be changed according to preferences
 def tok_func(x):
