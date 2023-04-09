@@ -139,10 +139,53 @@ trainer = Trainer(
     data_collator=data_collator # The data collator to use for collating input data during training
 )
 
+# ===========================================
+# ||                                       ||
+# ||Section 6: Perplexity                  ||
+# ||                                       ||
+# ===========================================
+
+# reference => https://huggingface.co/docs/transformers/perplexity
+
+# Tokenize the test data and convert it to PyTorch tensors
+text = "\n\n".join(test["text"]) # concatenate all the text in the test set
+encodings = tokz(text, return_tensors="pt") # get its integer id 
+
+max_length = model.config.n_positions
+stride = 512
+seq_len = encodings.input_ids.size(1)
+
+nlls = []
+prev_end_loc = 0
+for begin_loc in tqdm(range(0, seq_len, stride)):
+    end_loc = min(begin_loc + max_length, seq_len)
+    trg_len = end_loc - prev_end_loc  # may be different from stride on last loop
+    input_ids = encodings.input_ids[:, begin_loc:end_loc].to(device)
+    target_ids = input_ids.clone()
+    target_ids[:, :-trg_len] = -100
+
+    with torch.no_grad():
+        outputs = model(input_ids, labels=target_ids)
+
+        # loss is calculated using CrossEntropyLoss which averages over input tokens.
+        # Multiply it with trg_len to get the summation instead of average.
+        # We will take average over all the tokens to get the true average
+        # in the last step of this example.
+        neg_log_likelihood = outputs.loss * trg_len
+
+    nlls.append(neg_log_likelihood)
+
+    prev_end_loc = end_loc
+    if end_loc == seq_len:
+        break
+
+ppl = torch.exp(torch.stack(nlls).sum() / end_loc)
+print("evaluation: ",ppl)
+
 
 # ===========================================
 # ||                                       ||
-# ||Section 6: training and saving         ||
+# ||Section 7: training and saving         ||
 # ||                                       ||
 # ===========================================
 
