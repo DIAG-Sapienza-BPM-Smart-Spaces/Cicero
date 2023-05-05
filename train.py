@@ -1,251 +1,420 @@
+ 
 # ===========================================
 # ||                                       ||
 # ||Section 1: Importing modules           ||
 # ||                                       ||
 # ===========================================
 
-import os
-import torch
-from torch.utils.data import DataLoader
-from sklearn.model_selection import train_test_split
+import spacy
+import re
 import pandas as pd
-import transformers
-from optimum.bettertransformer import BetterTransformer
-from transformers import TrainingArguments, Trainer, AutoTokenizer, AutoModelForCausalLM, DataCollatorForLanguageModeling
-from datasets import load_dataset, Dataset, DatasetDict
-from pynvml import nvmlInit, nvmlDeviceGetHandleByIndex, nvmlDeviceGetMemoryInfo
-from utils import *
+import datetime
+import csv
+from os.path import exists
+import sys
 
-from fairscale.nn import Pipe
-from fairscale.nn.pipe.balance import balance_by_time
-from transformers import AutoModel
-
-from tqdm import tqdm
-
-os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "max_split_size_mb:512"
 # ===========================================
 # ||                                       ||
-# ||Section 2: checking gpu, choosing      ||
+# ||Section 2: Changing csv max length     ||
+# ||                                       ||
+# ===========================================
+
+csv.field_size_limit(sys.maxsize)
+
+# ===========================================
+# ||                                       ||
+# ||Section 2: Checking gpu, choosing      ||
 # ||             device, and model         ||
 # ||                                       ||
 # ===========================================
 
-# Check GPU availability and get the device
-#print(check_gpu_availability())
-device = getting_device()
-
-# Workin_models return a list of models that work with this script and colab non-premium, pick one
-model_nm = working_models()[3]
-
-print('Selected model: ', model_nm)
-# ===========================================
-# ||                                       ||
-# ||Section 3: Importing doc into dataset  ||
-# ||                                       ||
-# ===========================================
-
-# Set the path to the CSV file
-
-doc_path = "merge_22_04_3.csv"
-print('Selected train set', doc_path)
-# Load the data from the CSV file into two separate dataframes, one for training and one for testing
-train, test = load_into_dataframes(doc_path)
-#print_gpu_utilization()
-#print(len(train['text'].iloc[0])) # TODO elimina
-# Convert the dataframes into HF datasets, which can be used to train transformers
-ds = dataframe_2_datasets(train, test)
+path = '/home/gueststudente/Giustizia/Pre-processing/NER_model/it_nerIta_trf/it_nerIta_trf-0.0.0'
+spacy.prefer_gpu()             
+nlp = spacy.load(path)
+nlp2 = spacy.load("it_core_news_lg")
 
 # ===========================================
 # ||                                       ||
-# ||Section 4: tokenization and collider   ||
+# ||Section 3: Cleaninig                   ||
+# ||                                       ||
 # ||                                       ||
 # ===========================================
 
-# Load the tokenizer for the specified pre-trained language model
-tokz = AutoTokenizer.from_pretrained(model_nm)
 
-# Set the padding token to the end of sentence token
-tokz.pad_token = tokz.eos_token
+def cleaning_phase(path_file , name):
+    """This function executes the cleaning phase. It takes as input the file to be cleaned, path file, and the name you want to give to the .csv that will be created, name."""
+    judgments = reading_cleaning(path_file)
+    for key in judgments: 
+        judgments[key]= cleaning(judgments[key])
+    crea = saving_cleaning(judgments, name)
+    return None
 
-
-#print(list(ds.keys()))
-# GETTING MAX LENGTH
-max_length = get_max_lenghts(get_list_of_lengths(ds["train"]["text"], tokz))
-
-# Define a function that tokenizes a text input and returns a dictionary containing the tokenized input
-# max_lenght can be changed according to preferences
-def tok_func(x):
-    return tokz(x["text"], truncation=True, max_length=max_length, padding="max_length") #TODO max_length=100
-
-# Apply the tokenization function to the "train" and "test" datasets
-# removing the original "text" column and adding the tokenized column
-ds["train"] = ds["train"].map(tok_func, batched=True, remove_columns=['__index_level_0__', "text"])
-ds["test"] = ds["test"].map(tok_func, batched=True, remove_columns=['__index_level_0__', "text"])
-
-#print((ds["train"][:10]))
-# Define a data collator for the transformer that uses the same tokenizer as above and sets masked language modeling to false
-data_collator = DataCollatorForLanguageModeling(tokenizer=tokz, mlm=False)
-# ===========================================
-# ||                                       ||
-# ||Section 5: building the model          ||
-# ||                                       ||
-# ===========================================
-
-# should be empty before the training
-#print_gpu_utilization()
-
-# Load the pre-trained language model for causal language modeling with caching disabled
-# and move it to the specified device (e.g. GPU)
-model = AutoModelForCausalLM.from_pretrained(model_nm)
-
-#sample = torch.FloatTensor(ds['train'][0]['input_ids'])
-#partitions = torch.cuda.device_count()
-#print(partitions)
-#balance = balance_by_time(partitions, model.parameters(), sample)
-#print(balance)
-#model = Pipe(model, balance)
-#model_hf = AutoModelForCausalLM.from_pretrained("gpt2",device_map="auto")
-#model = BetterTransformer.transform(model_hf, keep_original_model=True)
-#model = BetterTransformer.transform(model, keep_original_model=False)
-#model = torch.nn.DataParallel(model)
-#model = model.to(device)
+def reading_cleaning(path_file):
+    """This function takes as input a file containing multiple judgments and creates a dictionary where each key element is the identifier of a judgment and the value is the corresponding judgment in string format."""
+    df = pd.read_csv(path_file, encoding = 'utf-8', sep=';')
+    df = df.dropna(subset=['numerosentenza', 'annosentenza', 'parte'])
+    judgments = {}
+    for index, row in df.iterrows():
+        key = str(int(row['numerosentenza'])) + '_' +str(int(row['annosentenza'])) + '_' +(row['parte'].replace(' ', '_'))
+        value = row['text'].replace('\n', ' ')
+        judgments[key] = value.split('Content-Type application/pdf')[1]
+    return judgments
 
 
-# if still empty something went wrong
-#print_gpu_utilization()
 
-# Set the hyperparameters for training the language model
-training_args = TrainingArguments(
-    model_nm, # The name of the pre-trained model to use
-    evaluation_strategy="epoch", # The frequency at which to evaluate the model during training (in this case, at the end of each epoch)
-    learning_rate=2e-5, # The learning rate to use for the optimizer during training
-    weight_decay=0.01, # The weight decay to use for the optimizer during training
-    num_train_epochs=4, # The number of epochs to train the model for
-    per_device_train_batch_size=1, # The batch size to use for training on each device (in this case, 2)
-    per_device_eval_batch_size=1, # The batch size to use for evaluation on each device (in this case, 2)
-    remove_unused_columns=False,
-    save_strategy="epoch",
-    save_total_limit=10,
-    sharded_ddp='zero_dp_2', # Full GPU parallelism
-    fp16=True # Whether to use mixed precision training to speed up training and reduce memory usage
-)
+def cleaning(text):
+    """This function takes an input string and performs the cleaning step. It removes superfluous content, changes expressions that can create problems for NLP algorithms, and performs an initial de-istantiation in a rule-based manner."""
+    months = {' gennaio ': '/01/', ' febbraio ': '/02/',  ' marzo '    : '/03/', ' aprile ' : '/04/', ' maggio '  : '/05/',
+        ' giugno ': '/06/', ' luglio ' : '/07/', ' agosto '  : '/08/',  ' settembre ': '/09/',
+        ' ottobre ': '/10/', ' novembre ': '/11/', ' dicembre ': '/12/'}
+    for i, j in months.items():
+        text = re.sub(i, j, text, flags=re.IGNORECASE) 
+    abbreviations = {'sig\.\s*ra': 'signora', 'sig\.\s*ri': 'signori','sig\.\s+': 'signor',
+                      'avv\.\s*ti':'avvocati' , 'avv\.\s+':'avvocato',
+                      'dott\.\s*ssa':'dottoressa', 'dott\.\s*ri':'dottori' , 'dott\.\s*sse':'dottoresse' , 'dott\.':'dottore',
+                      'geom\.': 'geometra',
+                      'est\.':'esterno',
+                      'on\.': 'onorevole',
+                      'cc\.dd\.': 'cosiddetto', 'c\.d\.': 'cosiddetto', 'c\.dd\.': 'cosiddetti',
+                      'est\.': 'esterno',  'int\.': 'interno',
+                      'coop\.': 'cooperativa',
+                      'p\.es\.': 'per esempio',
+                      'ecc\.': 'eccetera',
+                      'lett\.': 'lettera',
+                      '\s+co\.': ' comma',
+                      'doc\.': 'documento',
+                      'prof\.\s*ssa':'professoressa','prof\.': 'professore',
+                      'cfr\.':'confronta',
+                      'conf\.':'conforme',
+                      'cit\.':'citazione',
+                      'cap\.':'chapter',
+                      'circ\.':'circolare',
+                      'cost\.':'costituzione',  
+                      'fasc\.':'fascicolo',  
+                      'rag\.':'ragioniere', 
+                      'all\.':'allegato', 
+                      'p\.t\.':'pro tempore',
+                       '€\.':'€ ',
+                       'cass\.':'cassazione', 
+                       'ss\.uu\.':'sezioni unite',
+                       'c\.c\.':'codice civile',
+                       'd\.lgs\.':'decreto legislativo',
+                      'rel\.': 'relazione',
+                        'dir\.': 'diritto',
+                      'reg\.': 'regolamento',
+                      'sent\.': 'judgment',
+                      'delib\.': 'deliberazione',
+                      'c\.t\.u\.': "consulente tecnico d'ufficio",
+                      'c\.p\.c\.': 'codice procedure civile',
+                      'o\.d\.g\.': 'ordine dei giornalisti',
+                      'c\.p\.p\.': 'codice procedure penale',
+                      'a\.s\.': 'anno scolastico',
+                      'd\.l\.': 'decreto legge',
+                      't\.u\.': 'text unico',
+                      'vd\.|v\.': 'vedi',
+                      'reg\.':'regolamento'
+                        }
+    for i,j in abbreviations.items():
+        text = re.sub(i, j, text, flags=re.IGNORECASE)
+    text = re.sub(r"\bpagina\s*\d+\s*(di\s*\d+)?|\bpage\s*(\d+)?\s*(di\s*\d+)?", "", text, flags=re.IGNORECASE)
+    text = re.sub(r'(=){2,}|(-){2,}|§|\*|°|acroform|AUTVEND||•|','', text, flags=re.IGNORECASE)
+    text = re.sub(r'\s+', ' ', text)
+    text = re.sub(r'\s+[0-9]+/(n\.\s*)?[0-9]+[\s,.;\)]|n\.\s*[0-9]+/(n\.\s*)?[0-9]+[\s,.;\)]|numero\s*[0-9]+\s*del\s*[0-9]+', " <|NUMANN|> ", text) 
+    text = re.sub(r'(C\.F\.\s*)?\s*[A-Z]{3}\s*[A-Z]{3}\s*\d{2}\s*[A-Z]\d{2}\s*[A-Z]\d{3}\s*[A-Z]', " <|CODF|> ", text, flags=re.IGNORECASE)
+    text = re.sub(r'(http|ftp|https)://([\w_-]+(?:(?:\.[\w_-]+)+))([\w.,@?^=%&:/~+#-]*[\w@?^=%&/~+#-])?', " <|URL|> ", text, flags=re.IGNORECASE)
+    text = re.sub(r'F\s*i\s*r\s*m\s*a\s*t\s*o\s*D\s*a\s*:\s*[A-Z]*\s*[A-Z]*\s*[A-Z]*\s*[A-Z]*\s*[A-Z]*\s*[A-Z]*\s*[A-Z]*\s*[A-Z]*\s*[A-Z]*\s*[A-Z]*\s*[A-Z]*\s*[A-Z]*\s*', " ", text)
+    text = re.sub(r'(E)?\s*m es so D a\s*:\s*([A-Z0-9.]{0,2}\s+)*', ' ', text)
+    text = re.sub(r'[D\s+]a:\s*([A-Z0-9.]{0,2}\s+)*', ' ', text)
+    text = re.sub(r'\S\s*e\s*r\s*i\s*a\s*l\s*#\s*:\s*([a-z0-9]{0,3}\s+)*', ' ', text)
+    text = re.sub(r'\bsignaturedata date \d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\+\d{4}\b', '', text ,flags=re.IGNORECASE)
+    text = re.sub(r"file:///[A-Z]{1}:([^ ]){1,}\s+|extlnk://([^ ]){1,}\s+", " ", text)
+    text = re.sub(r"\bannotation\b", "", text, flags=re.IGNORECASE)
+    return text
 
-# Create a Trainer object that will be used to train the language model
-trainer = Trainer(
-    model=model, # The pre-trained language model to train
-    args=training_args, # The hyperparameters for training the model
-    train_dataset=ds["train"], # The dataset to use for training the model
-    eval_dataset=ds["test"], # The dataset to use for evaluating the model during training
-    data_collator=data_collator # The data collator to use for collating input data during training
-)
-
-# ===========================================
-# ||                                       ||
-# ||Section 6: Perplexity                  ||
-# ||                                       ||
-# ===========================================
-
-# reference => https://huggingface.co/docs/transformers/perplexity
-
-# Tokenize the test data and convert it to PyTorch tensors
-text = "\n\n".join(test["text"]) # concatenate all the text in the test set
-encodings = tokz(text, return_tensors="pt") # get its integer id 
-
-max_length = model.config.n_positions
-stride = 512
-seq_len = encodings.input_ids.size(1)
-
-nlls = []
-prev_end_loc = 0
-for begin_loc in tqdm(range(0, seq_len, stride)):
-    end_loc = min(begin_loc + max_length, seq_len)
-    trg_len = end_loc - prev_end_loc  # may be different from stride on last loop
-    input_ids = encodings.input_ids[:, begin_loc:end_loc].to(device)
-    target_ids = input_ids.clone()
-    target_ids[:, :-trg_len] = -100
-
-    with torch.no_grad():
-        outputs = model(input_ids, labels=target_ids)
-
-        # loss is calculated using CrossEntropyLoss which averages over input tokens.
-        # Multiply it with trg_len to get the summation instead of average.
-        # We will take average over all the tokens to get the true average
-        # in the last step of this example.
-        neg_log_likelihood = outputs.loss * trg_len
-
-    nlls.append(neg_log_likelihood)
-
-    prev_end_loc = end_loc
-    if end_loc == seq_len:
-        break
-
-ppl = torch.exp(torch.stack(nlls).sum() / end_loc)
-print("evaluation: ",ppl)
+def saving_cleaning(judgments, name):
+    """This function takes as input a dictionary containing strings, judgments and creates a .csv file. The name parameter specifies what the name of the created file will be."""
+    with open('/home/gueststudente/Giustizia/Pre-processing/Pipeline_files/Cleaning/'+ name +'_pulizia.csv', "w",  encoding = 'utf-8') as output:
+        writer = csv.writer(output)
+        for key, value in judgments.items():
+            writer.writerow([key, value])
+    return None
 
 
 # ===========================================
 # ||                                       ||
-# ||Section 7: training and saving         ||
+# ||Section 4: Division                    ||
+# ||                                       ||
 # ||                                       ||
 # ===========================================
 
-# train the model
-trainer.train()
+def division_phase(file):   
+    """This function takes as input the output of the cleaning phase and creates two files. The first file contains the judgments that were split correctly, the second file containing the judgments that were not split correctly."""
+    judgments = reading_division(file)
+    check_exist(file)
+    key_chapters = reading_key_chapters(file)
+    incorrect_divisions = reading_incorrect_divisions(file)
+    key_chapters, correct_divisions , incorrect_divisions = division(judgments, key_chapters, incorrect_divisions)
+    checking = check(correct_divisions , incorrect_divisions)
+    saving_division(key_chapters, incorrect_divisions, file)
+    return key_chapters , checking
 
-# Set the output directory
-output_dir = 'output2'
+def reading_division(file):
+    """This function takes as input the name of a file and returns a dictionary containing the, for each element, strings divided into chapters."""
+    with open('/home/gueststudente/Giustizia/Pre-processing/Pipeline_files/Cleaning/'+ file +'_pulizia.csv', mode='r', encoding = 'utf-8' ) as file:
+        reader = csv.reader(file , delimiter=',')
+        judgments = {} 
+        for row in reader:
+            if len(row) < 2:
+                continue
+            judgments[row[0]] = row[1]
+    return judgments
 
-# Create the output directory if it doesn't exist
-#if not os.path.exists(output_dir):
-#    os.makedirs(output_dir)
+def key(head):
+    """This function creates a unique identifier given a judgment header."""
+    head = head.replace(':','SEPARATORE').replace(',','SEPARATORE').split('SEPARATORE')
+    head = ('_'+head[0]+'_'+head[11]+'_'+head[4]).replace(' ', '')
+    return head
 
-# Save the model and tokenizer to the output directory
-trainer.save_model(output_dir)
-tokz.save_pretrained(output_dir)
+
+def divisore(judgment, dividers):
+    """This function takes as input a judgment and a list of dividers. For each element in dividers, if it is present in the judgment, it replaces it with a token 'DIVIDER__' which will be used to segment the judgment."""
+    for div in dividers:
+        judgment = judgment.replace(div, 'DIVIDERS__' )
+    last_occurrence_index = judgment.rfind('DIVIDERS__')
+    if last_occurrence_index != -1:
+        judgment = judgment[:last_occurrence_index] + 'DIVISORE_SEZIONE' + judgment[last_occurrence_index + len('DIVIDERS__'):] 
+    judgment = judgment.replace('DIVIDERS__', ' ')
+    return judgment
+
+def reading_key_chapters(file):
+    """This function reads the file containing that judgments that have already been divided into different chapters."""
+    with open('/home/gueststudente/Giustizia/Pre-processing/Pipeline_files/Division/'+ file + '_divisione.csv', 'r',  encoding = 'utf-8') as file:
+        reader = csv.reader(file)
+        key_chapters = list(reader)
+    return key_chapters
+
+def check_exist(file):
+    """This function checks if a split file already exists. If it does not exist it creates it."""
+    if not exists('/home/gueststudente/Giustizia/Pre-processing/Pipeline_files/Division/'+ file + '_divisione.csv'):
+        create = open('/home/gueststudente/Giustizia/Pre-processing/Pipeline_files/Division/'+ file + '_divisione.csv', 'x',  encoding = 'utf-8')
+    if not exists("/home/gueststudente/Giustizia/Pre-processing/Pipeline_files/Division/" + file + "_divisioni_sbagliate.txt"):
+        create = open("/home/gueststudente/Giustizia/Pre-processing/Pipeline_files/Division/" + file + "_divisioni_sbagliate.txt", 'x',  encoding = 'utf-8')
+    return None
+
+def reading_incorrect_divisions(file):
+    """This function is used to read the file containing the judgments that were not split correctly."""
+    with open("/home/gueststudente/Giustizia/Pre-processing/Pipeline_files/Division/" + file + "_divisioni_sbagliate.txt", "r", encoding = 'utf-8') as file:
+        incorrect_divisions = file.read().splitlines()
+    return incorrect_divisions
+
+def division(judgments, key_chapters, incorrect_divisions):
+    """This function takes as input judgments that need to be divided into chapters, judgments that have been correctly divided, and judgments that have been incorrectly divided, and adds the new judgments to either the first group or the second group."""
+    judgments_csv = [col[0] for col in key_chapters]
+    for key in judgments:
+        if key in judgments_csv:
+            continue
+        else:
+            judgment , errore  =  divisione_capitoli(judgments[key])
+            if errore:
+                incorrect_divisions.append(key)
+            else:
+                key_chapters.append([key, judgment[0], judgment[1], judgment[2]])
+                if key in incorrect_divisions:
+                    incorrect_divisions.remove(key)
+    judgments_csv = [col[0] for col in key_chapters]
+    return key_chapters, judgments_csv, incorrect_divisions
+
+def check(correct_divisions , incorrect_divisions):
+    """This function takes as input the list of correctly split sentences and incorrectly split sentences. It checks for identifiers of judgments present in both sets."""
+    intersection = list(set(correct_divisions) & set(incorrect_divisions))
+    if intersection != []:
+        print ('errore check')
+        return intersection
+    return None
+
+def saving_division(key_chapters , incorrect_divisions , name):
+    """Questa funzione prende in input le sentenze correttamente divise, le sentenze non correttamente e salva in formato .csv e .txt. Il terzo parametro indica quale nome attribuire ai due file."""
+    incorrect_divisions = [key.replace('\n', '') for key in incorrect_divisions]
+    incorrect_divisions = [key for key in incorrect_divisions if key != '']
+    incorrect_divisions = set(incorrect_divisions)
+    with open("/home/gueststudente/Giustizia/Pre-processing/Pipeline_files/Division/" + name + "_divisioni_sbagliate.txt", "w", encoding = 'utf-8') as output:
+        for item in incorrect_divisions:
+            output.write("%s\n" % item)
+    
+    with open('/home/gueststudente/Giustizia/Pre-processing/Pipeline_files/Division/'+ name + '_divisione.csv' , 'w', newline='',  encoding = 'utf-8') as name:
+        writer = csv.writer(name)
+        writer.writerows(key_chapters)
+
+    return None
+
+
+
+
+def divisione_capitoli(judgment):
+    """This function takes as input correctly split judgments, incorrectly split judgments, and saves in .csv and .txt format. The third parameter indicates what name to give to the two files."""
+    divider1 = ['MOTIVI DELLA DECISIONE',
+                  'RAGIONI IN FATTO E DIRITTO DELLA DECISIONE',
+                  'FATTO E DIRITTO',
+                  'RAGIONI IN FATTO ED IN DIRITTO DELLA DECISIONE',
+                  'MOTIVI IN FATTO E IN DIRITTO',
+                  'Svolgimento del processo e motivi della decisione',
+                  'S V O L G I M E N T O D E L P R O C E S S O', 
+                  'RAGIONI DELLA DECISIONE',
+                  'Motivi della decisione' ,
+                  'Svolgimento del processo',
+                  'C O N S I D E R A T O',
+                  'MOTIVAZIONE',
+                  'CONCLUSIONI DELLE PARTI',
+                  'CON LA PARTECIPAZIONE DEL PUBBLICO MINISTERO ',
+                  'SVOLGIMENTO DEL PROC ESSO', 
+                  'svolgimento del processo',
+                  'RAGIONI DI FATTO E DI DIRITTO  DELLA  DECISIONE',
+                  'RAGIONI DI FATTO E DI DIRITTO',
+                 'MOTIVI DELLA DECISIONE IN FATTO E DIRITTO',
+                  'CONCLUSIONI',
+                 'Conclusioni rassegnate congiuntamente dalle parti:',
+                 'N O N C H E']
+    divider2 = [  'P.Q.M',
+                  'P. Q. M',
+                  'P. Q. M',
+                  'P.   Q.   M',
+                  'M O T I V I D E L L A D E C I S I O N E',
+                  'P Q M',
+                 'p.q.m' ,
+                  'PQM' , 
+                  'P.Q.M',
+                  'P.Q.M.',
+                  'P.Q.M.']  
+    judgment = divisore(judgment, divider1)
+    judgment = divisore(judgment, divider2)  
+    judgment = judgment.split('DIVISORE_SEZIONE')
+    if len(judgment) != 3:
+        return judgment , True
+    else:
+        return judgment , False
 
 
 # ===========================================
 # ||                                       ||
-# ||Section 7: Perplexity                  ||
+# ||Section 5: Anonymization               ||
+# ||                                       ||
 # ||                                       ||
 # ===========================================
 
-# reference => https://huggingface.co/docs/transformers/perplexity
 
-# Tokenize the test data and convert it to PyTorch tensors
-text = "\n\n".join(test["text"]) # concatenate all the text in the test set
-encodings = tokz(text, return_tensors="pt") # get its integer id 
+def deinstantiation_phase(file, chapter):
+    """This function takes as input the output of the division phase and the chapter you want to de-instantiate. The output is the text of the de-istanced file. In addition, the function creates a .txt file that saves the de-instantiated text."""
+    chunks = reading_deinstantiation(file, chapter)
+    text = deinstantiation(chunks)
+    text = token(text)
+    saving_deinstantiation(text, file, chapter) 
+    return text
 
-max_length = model.config.n_positions
-stride = 512
-seq_len = encodings.input_ids.size(1)
+def reading_deinstantiation(file, chapter):
+    """This function takes as input the output of the division phase and the chapter you want to de-instantiate. The function returns, for each sentence in the file, only the desired chapters."""
+    read = reading_key_chapters(file)
+    chunks = []
+    for judgment in read:
+        judgment = judgment[int(chapter)]
+        chunks.append(judgment)
+    return chunks    
 
-nlls = []
-prev_end_loc = 0
-for begin_loc in tqdm(range(0, seq_len, stride)):
-    end_loc = min(begin_loc + max_length, seq_len)
-    trg_len = end_loc - prev_end_loc  # may be different from stride on last loop
-    input_ids = encodings.input_ids[:, begin_loc:end_loc].to(device)
-    target_ids = input_ids.clone()
-    target_ids[:, :-trg_len] = -100
+def deinstantiation(chapters):
+    """This function takes as input the output of 'reading_deinstantiation(file, chapter)' and de-instantiates the data using the spacy pattern named 'nlp'. The output is a string."""
+    text = ''
+    for text in chapters:
 
-    with torch.no_grad():
-        outputs = model(input_ids, labels=target_ids)
+        doc = nlp(text) 
+        for e in reversed(doc.ents):
+            start = e.start_char
+            end = start + len(e.text)
+            if e.label_ in ["WORK_OF_ART" , "LANGUAGE"]:
+                continue
+            text = text[:start] + e.label_ + text[end:]
+        text +=  text
+        text += '\n' 
+    return text
 
-        # loss is calculated using CrossEntropyLoss which averages over input tokens.
-        # Multiply it with trg_len to get the summation instead of average.
-        # We will take average over all the tokens to get the true average
-        # in the last step of this example.
-        neg_log_likelihood = outputs.loss * trg_len
+def token(text):
+    """This function takes as input the ouput of the 'deinstantiation(chapters)' function and modifies the labels to facilitate the training phase."""
+    labels = ["PERCENT", "PER", "NORP", "ORG", "GPE", "LOC", "DATE", "MONEY","FAC", "PRODUCT", "EVENT",
+              "LAW", "TIME", "QUANTITY", "ORDINAL", "CARDINAL", "LANGUAGE"]
+    for label in labels:
+        text = re.sub(r'(\b'+label+ '\s*){1,}', ' <|'+ label + '|> ' , text)
+    return(text)
 
-    nlls.append(neg_log_likelihood)
+def saving_deinstantiation(text,file, chapter):
+    """This function takes as input the uotput of the 'token(text)' function, the name you want to give to the file to be created, and the capitil that has been de-istanced. The function creates a .txt file containing the de-istanced sentences."""
+    with open("/home/gueststudente/Giustizia/Pre-processing/Pipeline_files/De-istantiation/" + file + "_"  + chapter + ".txt", "w",  encoding = 'utf-8') as output:  
+        output.write("%s\n" % text)
+    output.close()
+    return None
 
-    prev_end_loc = end_loc
-    if end_loc == seq_len:
-        break
+# ===========================================
+# ||                                       ||
+# ||Section 6: Creating Dataframe          ||
+# ||                                       ||
+# ||                                       ||
+# ===========================================
 
-ppl = torch.exp(torch.stack(nlls).sum() / end_loc)
-print("evaluation: ",ppl)
+def create_dataframe(text_files, chapter,  length = '600'):
+    """This function takes as input a file containing the de-spaced sentences, the chapters that are in the file, and a length. The function will create a file that splits the chapters into chunks of the maximum length 'length'."""
+    phrases = []
+    for i, text_file in enumerate(text_files):
+        with open(text_file, encoding = 'utf-8') as file:
+            content = file.read()
+            phrases.extend(content.split('\n'))
+    phrases = min_length(phrases)
+    df = pd.DataFrame({'Capitoli': phrases}, index=range(len(phrases)))
+    df['Capitoli'] = df['Capitoli'].str.replace('\n', '')
+    outliers = []
+    for i in range(len(df)):
+        if len(df.loc[i]['Capitoli']) > int(length):
+            outliers.append(i) 
+    df = df.drop(outliers)
+    df.reset_index()
+    df.to_csv('/home/gueststudente/Giustizia/Pre-processing/Pipeline_files/Merging/merge_' + chapter + '_'+ length + '.csv', index=False, encoding = 'utf-8' )
+    return df
+
+def min_length(phrases):
+    """This function takes as input a list of strings. Each string is a chapter of a sentence. The function divides each chapter into sentences. The function saves only sentences containing more than 10 words."""
+    final_document = []
+    for chapter in phrases:
+      doc = nlp2(chapter)
+      for sent in doc.sents:
+        if len(sent.text.split()) > 10:
+            final_document.append(sent.text)
+        else:
+            continue
+    return final_document
 
 
+# ===========================================
+# ||                                       ||
+# ||Section 7: Executing preprocessing     ||
+# ||           pipeline                    ||
+# ||                                       ||
+# ===========================================
 
+chapter = '2'
+
+
+for i in [100]: 
+    i = str(i)
+
+    if not exists('/home/gueststudente/Giustizia/Pre-processing/Original_sentences/'+ i + '.csv'):
+        continue
+    print(i)
+    clean = cleaning_phase('/home/gueststudente/Giustizia/Pre-processing/Original_sentences/'+ i + '.csv',i)
+    print(i, 'ok1')
+    div = division_phase(i)
+    print(i, 'ok2')
+    anon = deinstantiation_phase(i, chapter)
+    print(i, 'ok3')
+    files = []
+
+for i in [100]:
+    if not exists('/home/gueststudente/Giustizia/Pre-processing/Pipeline_files/De-istantiation/'+str(i)+'_'+ chapter +'.txt'):
+        continue
+
+    files.append('/home/gueststudente/Giustizia/Pre-processing/Pipeline_files/De-istantiation/'+str(i)+'_'+ chapter +'.txt')
