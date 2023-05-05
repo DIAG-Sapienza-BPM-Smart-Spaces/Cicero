@@ -69,9 +69,7 @@ def print_summary(result):
 
 def working_models() -> list:
     # Define a list of working models
-    models = ["GroNLP/gpt2-medium-italian-embeddings","sberbank-ai/mGPT","GroNLP/gpt2-small-italian", "GroNLP/gpt2-medium-italian-embeddings", "facebook/xglm-1.7B",
-              "facebook/xglm-7.5B",  "facebook/xglm-564M" ]
-    
+    models = models = ["facebook/xglm-2.9B", "facebook/xglm-1.7B", "facebook/xglm-564M" , "GroNLP/gpt2-medium-italian-embeddings", "LorenzoDeMattei/GePpeTto", "sberbank-ai/mGPT"]
     # Return the list of models
     return models
 
@@ -92,6 +90,7 @@ def load_into_dataframes(path_2_corpus: str, reduce_size = 0, split_size = 0.2, 
     # Read the csv file into a dataframe
     df = pd.read_csv(path_2_corpus,  engine='python', index_col=False)
 
+    
     # Rename the column to "text"
     df = df.rename(columns={df.columns[0]: "text"})
 
