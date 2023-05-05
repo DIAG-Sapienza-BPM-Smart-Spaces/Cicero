@@ -1,5 +1,5 @@
 # Cicero
-Dockerized application for training of the Cicero generative language model for e-justice
+Dockerized application for training using multi-gpu parallelism of the Cicero generative language model for e-justice
 
 ## Preprocessing
 In this repository it is included the source file used to preprocess the judicial sentences dataset, that will not be shared. In order to run the training it is necessary to provide a dataset in csv format.
