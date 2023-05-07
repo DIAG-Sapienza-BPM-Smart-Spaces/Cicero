@@ -1,4 +1,4 @@
-#version: 0.2
+#version: 0.2 - Trained by `huggingface/tokenizers`
 Ġ d
 o n
 Ġ c
