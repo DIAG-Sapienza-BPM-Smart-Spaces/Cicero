@@ -1,4 +1,3 @@
- 
 # ===========================================
 # ||                                       ||
 # ||Section 1: Importing modules           ||
@@ -148,7 +147,7 @@ def saving_cleaning(judgments, name):
 # ===========================================
 
 def division_phase(file):   
-    """This function takes as input the output of the cleaning phase and creates two files. The first file contains the judgments that were split correctly, the second file containing the judgments that were not split correctly."""
+    """This function takes as input the output of the cleaning phase and creates two files. The first file contains judgments that were split correctly, the second file containing judgments that were not split correctly."""
     judgments = reading_division(file)
     check_exist(file)
     key_chapters = reading_key_chapters(file)
@@ -159,7 +158,7 @@ def division_phase(file):
     return key_chapters , checking
 
 def reading_division(file):
-    """This function takes as input the name of a file and returns a dictionary containing the, for each element, strings divided into chapters."""
+    """This function takes as input the name of a file and returns a dictionary containing, for each element, judgments divided into chapters."""
     with open('/home/gueststudente/Giustizia/Pre-processing/Pipeline_files/Cleaning/'+ file +'_pulizia.csv', mode='r', encoding = 'utf-8' ) as file:
         reader = csv.reader(file , delimiter=',')
         judgments = {} 
@@ -176,8 +175,8 @@ def key(head):
     return head
 
 
-def divisore(judgment, dividers):
-    """This function takes as input a judgment and a list of dividers. For each element in dividers, if it is present in the judgment, it replaces it with a token 'DIVIDER__' which will be used to segment the judgment."""
+def divider(judgment, dividers):
+    """This function takes as input a judgment and a list of dividers. For each element in dividers, if it is present in the judgment, it replaces it with a token 'DIVIDER__' which will be used to segment the judgment into chapters."""
     for div in dividers:
         judgment = judgment.replace(div, 'DIVIDERS__' )
     last_occurrence_index = judgment.rfind('DIVIDERS__')
@@ -187,14 +186,14 @@ def divisore(judgment, dividers):
     return judgment
 
 def reading_key_chapters(file):
-    """This function reads the file containing that judgments that have already been divided into different chapters."""
+    """This function reads the file containing judgments that have already been divided into different chapters."""
     with open('/home/gueststudente/Giustizia/Pre-processing/Pipeline_files/Division/'+ file + '_divisione.csv', 'r',  encoding = 'utf-8') as file:
         reader = csv.reader(file)
         key_chapters = list(reader)
     return key_chapters
 
 def check_exist(file):
-    """This function checks if a split file already exists. If it does not exist it creates it."""
+    """This function checks if a split file already exists. If it does not exist, it creates it."""
     if not exists('/home/gueststudente/Giustizia/Pre-processing/Pipeline_files/Division/'+ file + '_divisione.csv'):
         create = open('/home/gueststudente/Giustizia/Pre-processing/Pipeline_files/Division/'+ file + '_divisione.csv', 'x',  encoding = 'utf-8')
     if not exists("/home/gueststudente/Giustizia/Pre-processing/Pipeline_files/Division/" + file + "_divisioni_sbagliate.txt"):
@@ -202,7 +201,7 @@ def check_exist(file):
     return None
 
 def reading_incorrect_divisions(file):
-    """This function is used to read the file containing the judgments that were not split correctly."""
+    """This function is used to read the file containing judgments that were not split correctly."""
     with open("/home/gueststudente/Giustizia/Pre-processing/Pipeline_files/Division/" + file + "_divisioni_sbagliate.txt", "r", encoding = 'utf-8') as file:
         incorrect_divisions = file.read().splitlines()
     return incorrect_divisions
@@ -214,7 +213,7 @@ def division(judgments, key_chapters, incorrect_divisions):
         if key in judgments_csv:
             continue
         else:
-            judgment , errore  =  divisione_capitoli(judgments[key])
+            judgment , errore  =  chapter_division(judgments[key])
             if errore:
                 incorrect_divisions.append(key)
             else:
@@ -225,7 +224,7 @@ def division(judgments, key_chapters, incorrect_divisions):
     return key_chapters, judgments_csv, incorrect_divisions
 
 def check(correct_divisions , incorrect_divisions):
-    """This function takes as input the list of correctly split sentences and incorrectly split sentences. It checks for identifiers of judgments present in both sets."""
+    """This function takes as input the list of correctly split sentences and the list of incorrectly split sentences. It checks for identifiers of judgments present in both sets."""
     intersection = list(set(correct_divisions) & set(incorrect_divisions))
     if intersection != []:
         print ('errore check')
@@ -233,7 +232,7 @@ def check(correct_divisions , incorrect_divisions):
     return None
 
 def saving_division(key_chapters , incorrect_divisions , name):
-    """Questa funzione prende in input le sentenze correttamente divise, le sentenze non correttamente e salva in formato .csv e .txt. Il terzo parametro indica quale nome attribuire ai due file."""
+    """This function takes as input correctly split sentences, incorrectly split sentences, and saves the firsts in a .csv format and the seconds in a .txt format. The third parameter indicates what name to give to the two files."""
     incorrect_divisions = [key.replace('\n', '') for key in incorrect_divisions]
     incorrect_divisions = [key for key in incorrect_divisions if key != '']
     incorrect_divisions = set(incorrect_divisions)
@@ -250,8 +249,8 @@ def saving_division(key_chapters , incorrect_divisions , name):
 
 
 
-def divisione_capitoli(judgment):
-    """This function takes as input correctly split judgments, incorrectly split judgments, and saves in .csv and .txt format. The third parameter indicates what name to give to the two files."""
+def chapter_division(judgment):
+    """This function takes as input a judgment and divided it in chapters. If the division is not succesfull completed it returns the divided judgment and the boolean True otherwise it return the divided judgment and the boolean False """
     divider1 = ['MOTIVI DELLA DECISIONE',
                   'RAGIONI IN FATTO E DIRITTO DELLA DECISIONE',
                   'FATTO E DIRITTO',
@@ -285,8 +284,8 @@ def divisione_capitoli(judgment):
                   'P.Q.M',
                   'P.Q.M.',
                   'P.Q.M.']  
-    judgment = divisore(judgment, divider1)
-    judgment = divisore(judgment, divider2)  
+    judgment = divider(judgment, divider1)
+    judgment = divider(judgment, divider2)  
     judgment = judgment.split('DIVISORE_SEZIONE')
     if len(judgment) != 3:
         return judgment , True
@@ -296,7 +295,7 @@ def divisione_capitoli(judgment):
 
 # ===========================================
 # ||                                       ||
-# ||Section 5: Anonymization               ||
+# ||Section 5: De-istantiation             ||
 # ||                                       ||
 # ||                                       ||
 # ===========================================
@@ -344,7 +343,7 @@ def token(text):
     return(text)
 
 def saving_deinstantiation(text,file, chapter):
-    """This function takes as input the uotput of the 'token(text)' function, the name you want to give to the file to be created, and the capitil that has been de-istanced. The function creates a .txt file containing the de-istanced sentences."""
+    """This function takes as input the output of the 'token(text)' function, the name you want to give to the file to be created, and the chapter that has been de-istanced. The function creates a .txt file containing the de-istanced sentences."""
     with open("/home/gueststudente/Giustizia/Pre-processing/Pipeline_files/De-istantiation/" + file + "_"  + chapter + ".txt", "w",  encoding = 'utf-8') as output:  
         output.write("%s\n" % text)
     output.close()
@@ -352,7 +351,7 @@ def saving_deinstantiation(text,file, chapter):
 
 # ===========================================
 # ||                                       ||
-# ||Section 6: Creating Dataframe          ||
+# ||Section 6: Dataframe Creation          ||
 # ||                                       ||
 # ||                                       ||
 # ===========================================
@@ -388,33 +387,27 @@ def min_length(phrases):
             continue
     return final_document
 
+# ===========================================
+# ||                                       ||
+# ||Section 6: Preprocess Running          ||
+# ||                                       ||
+# ||                                       ||
+# ===========================================
 
-# ===========================================
-# ||                                       ||
-# ||Section 7: Executing preprocessing     ||
-# ||           pipeline                    ||
-# ||                                       ||
-# ===========================================
+#In the example we preprocess the second chapter of the '100.csv' file
 
 chapter = '2'
-
-
 for i in [100]: 
-    i = str(i)
-
     if not exists('/home/gueststudente/Giustizia/Pre-processing/Original_sentences/'+ i + '.csv'):
         continue
-    print(i)
     clean = cleaning_phase('/home/gueststudente/Giustizia/Pre-processing/Original_sentences/'+ i + '.csv',i)
-    print(i, 'ok1')
     div = division_phase(i)
-    print(i, 'ok2')
     anon = deinstantiation_phase(i, chapter)
-    print(i, 'ok3')
-    files = []
 
+files = []
 for i in [100]:
     if not exists('/home/gueststudente/Giustizia/Pre-processing/Pipeline_files/De-istantiation/'+str(i)+'_'+ chapter +'.txt'):
         continue
-
     files.append('/home/gueststudente/Giustizia/Pre-processing/Pipeline_files/De-istantiation/'+str(i)+'_'+ chapter +'.txt')
+
+merge = create_dataframe(files, chapter)
