@@ -6,9 +6,13 @@ from transformers import AutoModelForCausalLM, AutoTokenizer
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
 # Load the saved model and tokenizer
-model_path = '../final_model/'
-model = AutoModelForCausalLM.from_pretrained(model_path).to(device)
-tokenizer = AutoTokenizer.from_pretrained(model_path)
+# model_path = '../final_model/'
+# model = AutoModelForCausalLM.from_pretrained(model_path).to(device)
+# tokenizer = AutoTokenizer.from_pretrained(model_path)
+
+# Load model directly
+tokenizer = AutoTokenizer.from_pretrained("DIAG-PSSeng/cicero-gpt2")
+model = AutoModelForCausalLM.from_pretrained("DIAG-PSSeng/cicero-gpt2")
 
 def generate_text(prompt):
     # Encode the prompt
