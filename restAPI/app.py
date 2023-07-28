@@ -1,8 +1,11 @@
 from flask import Flask, request, jsonify, render_template, make_response
 from transformers import AutoModelForCausalLM, AutoTokenizer
+from waitress import serve
 import torch
 import json
 import sys
+
+#START: waitress-serve --port=8080 --call app:create_app
 
 app = Flask(__name__)
 
@@ -13,13 +16,22 @@ model = AutoModelForCausalLM.from_pretrained("DIAG-PSSeng/cicero-gpt2")
 predictions = {}
 current_id = 0
 
-if __name__ == '__main__':
-    # app.run(host="localhost", port=8000, debug=True)
-    app.run(debug=True)
+""" if __name__ == '__main__':
+    # reset variables at server start/restart
+    predictions.clear()
+    current_id = 0
+    #app.run(host="localhost", port=8000, debug=True)
+    app.run(debug=True) """
 
 @app.route('/')
 def welcome():
     return render_template('index.html')
+
+def create_app():
+   global current_id
+   predictions.clear()
+   current_id = 0
+   return app
 
 
 @app.route('/predictions', methods=['GET', 'POST', 'DELETE'])
