@@ -39,7 +39,7 @@ def get_predictions():
 
             # predict the result
             input_ids = tokenizer.encode(input_request, return_tensors='pt').to(device)
-            output = model.generate(input_ids=input_ids, max_length=150, do_sample=True)
+            output = model.generate(input_ids=input_ids, max_length=50, do_sample=True)
             generated_text = tokenizer.decode(output[0], skip_special_tokens=True)
 
             # save the prediction result
