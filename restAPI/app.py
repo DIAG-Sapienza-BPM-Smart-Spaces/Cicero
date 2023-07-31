@@ -5,7 +5,7 @@ import torch
 import json
 import sys
 
-#START: waitress-serve --port=8080 --call app:create_app
+#START: waitress-serve --port=8080 --call app:start_server
 
 app = Flask(__name__)
 
@@ -27,7 +27,7 @@ current_id = 0
 def welcome():
     return render_template('index.html')
 
-def create_app():
+def start_server():
    global current_id
    predictions.clear()
    current_id = 0
