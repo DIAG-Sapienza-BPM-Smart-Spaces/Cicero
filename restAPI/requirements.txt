@@ -2,6 +2,7 @@ catalogue==2.0.9
 datasets==2.10.1
 Flask==2.3.2
 frozenlist==1.4.0
+gunicorn==21.2.0
 huggingface-hub==0.16.4
 multiprocess==0.70.14
 networkx==3.1
@@ -35,4 +36,3 @@ tokenizers==0.13.3
 torch==2.0.0
 torchvision==0.15.1
 transformers==4.27.3
-waitress==2.1.2

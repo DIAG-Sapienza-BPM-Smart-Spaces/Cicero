@@ -1,17 +1,18 @@
 from flask import Flask, request, jsonify, render_template, make_response
 from transformers import AutoModelForCausalLM, AutoTokenizer
-from waitress import serve
 import torch
 import json
 import sys
 
-#START: waitress-serve --port=8080 --call app:start_server
+#START: gunicorn --certfile cert.pem --keyfile key.pem -b 0.0.0.0:9999 'app:start_server()'
 
 app = Flask(__name__)
 
-device = 'cuda' if torch.cuda.is_available() else 'cpu'
+#device = 'cuda' if torch.cuda.is_available() else 'cpu'
+device = 'cpu'
 tokenizer = AutoTokenizer.from_pretrained("DIAG-PSSeng/cicero-gpt2")
 model = AutoModelForCausalLM.from_pretrained("DIAG-PSSeng/cicero-gpt2")
+#model.to("cuda")
 
 predictions = {}
 current_id = 0
@@ -46,12 +47,12 @@ def get_predictions():
     elif request.method == 'POST':
         content_type = request.headers.get('Content-Type')
         if (content_type == 'text/plain'):
-            input_request= request.data.decode('UTF-8')
-            #DEBUG print(input_request, file=sys.stderr)
+            input_request= request.data.decode('UTF-8').split()[-4:]        # Slice the received text according to desired input lenght
+            input = " ".join(input_request)
 
             # predict the result
-            input_ids = tokenizer.encode(input_request, return_tensors='pt').to(device)
-            output = model.generate(input_ids=input_ids, max_length=50, do_sample=True)
+            input_ids = tokenizer.encode(input, return_tensors='pt').to(device)
+            output = model.generate(input_ids=input_ids, max_length=30, do_sample=True)
             generated_text = tokenizer.decode(output[0], skip_special_tokens=True)
 
             # save the prediction result
