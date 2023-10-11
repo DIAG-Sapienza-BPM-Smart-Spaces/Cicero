@@ -1,0 +1,21 @@
+# (1)
+FROM python:3.9
+
+# (2)
+WORKDIR code
+
+# (3)
+COPY ./requirements.txt /code/requirements.txt
+
+# (4)
+RUN pip install --no-cache-dir --upgrade -r /code/requirements.txt
+RUN pip install --no-cache-dir --upgrade -v torch==2.0.0+cu117 --extra-index-url https://download.pytorch.org/whl/cu117
+# (5)
+COPY . /code/
+
+# (6)
+CMD NCCL_IB_DISABLE=1 NCCL_SOCKET_IFNAME=lo NCCL_SHM_DISABLE=1 OMP_NUM_THREADS=128 python3 -m torch.distributed.launch --nproc_per_node=8 train.py --per_device_train_batch_size 1 \
+--output_dir output_dir --overwrite_output_dir \
+--do_train --do_eval  --max_seq_samples 500 --num_train_epochs 1 \
+--fp16 \ 
+--sharded_ddp zero_dp_2
