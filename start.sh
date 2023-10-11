@@ -1,6 +1,6 @@
 #!/bin/bash
 
-$volume_name=$1
+volume_name=$1
 
 mkdir $volume_name
 

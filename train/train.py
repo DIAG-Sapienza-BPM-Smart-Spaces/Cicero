@@ -118,16 +118,13 @@ model = AutoModelForCausalLM.from_pretrained(model_nm)
 training_args = TrainingArguments(
     model_nm, # The name of the pre-trained model to use
     evaluation_strategy="epoch", # The frequency at which to evaluate the model during training (in this case, at the end of each epoch)
-    learning_rate=2e-5, # The learning rate to use for the optimizer during training
-    weight_decay=0.01, # The weight decay to use for the optimizer during training
-    num_train_epochs=4, # The number of epochs to train the model for
     per_device_train_batch_size=1, # The batch size to use for training on each device (in this case, 2)
     per_device_eval_batch_size=1, # The batch size to use for evaluation on each device (in this case, 2)
     remove_unused_columns=False,
-    save_strategy="epoch",
-    save_total_limit=10,
-    sharded_ddp='zero_dp_2', # Full GPU parallelism
-    fp16=True # Whether to use mixed precision training to speed up training and reduce memory usage
+    fp16=True,
+    num_train_epochs=3,
+    max_train_samples=500,
+    output_dir=output_dir
 )
 
 # Create a Trainer object that will be used to train the language model

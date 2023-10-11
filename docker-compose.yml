@@ -1,0 +1,12 @@
+version: "3.3"
+
+services:
+  backend: 
+    build: 
+      context: .
+      dockerfile: Dockerfile
+    volumes:
+      - rotalaser_volume:
+      - /home/ubuntu/rotalaser/cardboard_errors:/app/cardboard_errors 
+    depends_on:
+      - "db"
