@@ -90,7 +90,7 @@ def load_into_dataframes(path_2_corpus: str, reduce_size = 0, split_size = 0.2, 
     # Read the csv file into a dataframe
     df = pd.read_csv(path_2_corpus,  engine='python', index_col=False)
 
-    
+    df = df.head(10000) 
     # Rename the column to "text"
     df = df.rename(columns={df.columns[0]: "text"})
 
