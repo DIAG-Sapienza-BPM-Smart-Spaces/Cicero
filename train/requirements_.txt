@@ -4,7 +4,7 @@ pynvml==11.5.0
 scikit_learn==1.2.2
 spacy==3.5.1
 torch==2.0.0
-transformers==4.34.0
+transformers==4.36.0
 optimum==1.13.2
 fairscale==0.4.13
 accelerate==0.23.0
