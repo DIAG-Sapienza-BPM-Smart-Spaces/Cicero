@@ -1,9 +1,6 @@
 # Cicero
 Dockerized application for training using multi-gpu parallelism of the Cicero generative language model for e-justice
 
-## Final Model
-The final results of the training are included in this repository.
-
 ## GUI Demo
 It is possible to test the model sentence generation using the file in the respective folder.
 
